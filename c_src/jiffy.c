@@ -47,6 +47,7 @@ load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
     st->atom_copy_strings = make_atom(env, "copy_strings");
     st->atom_max_depth = make_atom(env, "max_depth");
     st->atom_json = make_atom(env, "json");
+    st->atom_undefined = make_atom(env, "undefined");
 
     // Markers used in encoding
     st->ref_object = make_atom(env, "$object_ref$");

@@ -1096,6 +1096,9 @@ enc_run(ErlNifEnv* env, Encoder* e, ERL_NIF_TERM res, ERL_NIF_TERM terms,
                     ret = enc_error(e, "false");
                     goto done;
                 }
+            } else if(enif_is_identical(curr, e->atoms->atom_undefined)) {
+                ret = enc_obj_error(e, "invalid_ejson", curr);
+                goto done;
             } else if(!enc_atom(e, curr)) {
                 ret = enc_obj_error(e, "invalid_string", curr);
                 goto done;
