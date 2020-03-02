@@ -58,6 +58,7 @@ typedef struct {
     ERL_NIF_TERM    atom_max_depth;
     ERL_NIF_TERM    atom_json;
     ERL_NIF_TERM    atom_undefined;
+    ERL_NIF_TERM    atom_utf8_invalid_char_as_is;
 
     ERL_NIF_TERM    ref_object;
     ERL_NIF_TERM    ref_array;

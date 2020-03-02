@@ -34,6 +34,7 @@
                         | return_trailer
                         | dedupe_keys
                         | copy_strings
+                        | utf8_invalid_char_as_is
                         | {null_term, any()}
                         | {max_depth, non_neg_integer()}
                         | {bytes_per_iter, non_neg_integer()}
