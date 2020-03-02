@@ -59,6 +59,7 @@ typedef struct {
     int             pretty;
     int             use_nil;
     int             escape_forward_slashes;
+    int             trim_trailing_zeros_in_doubles;
 
     int             shiftcnt;
     int             count;
@@ -690,7 +691,20 @@ enc_double(Encoder* e, double val)
     // Normalize -0.0 to 0.0 for JSON output
     if(val == 0.0) val = 0.0;
 
-    e->i += d2s_buffered_n(val, (char*)&(e->p[e->i]));
+    size_t len = d2s_buffered_n(val, (char*)&(e->p[e->i]));
+    if(e->trim_trailing_zeros_in_doubles) {
+        unsigned char* start = &(e->p[e->i]);
+        size_t dot;
+        for(dot = 0; dot + 1 < len; dot++) {
+            if(start[dot] == '.' && start[dot + 1] == '0' &&
+                    (dot + 2 == len || start[dot + 2] == 'e')) {
+                memmove(start + dot, start + dot + 2, len - dot - 2);
+                len -= 2;
+                break;
+            }
+        }
+    }
+    e->i += len;
     e->count++;
     return 1;
 }
@@ -889,6 +903,8 @@ encode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             continue;
         } else if(get_bytes_per_red(env, val, &(e->bytes_per_red))) {
             continue;
+        } else if(enif_is_identical(val, e->atoms->atom_trim_trailing_zeros_in_doubles)) {
+            e->trim_trailing_zeros_in_doubles = 1;
         } else {
             return enif_make_badarg(env);
         }
