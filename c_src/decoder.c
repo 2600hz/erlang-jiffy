@@ -37,6 +37,7 @@ typedef struct {
     int             return_maps;
     int             return_trailer;
     int             dedupe_keys;
+    int             error_on_duplicate_key;
     int             copy_strings;
     ERL_NIF_TERM    null_term;
     int             utf8_invalid_char_as_is;
@@ -501,6 +502,8 @@ decode_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             d->return_trailer = 1;
         } else if(enif_is_identical(val, d->atoms->atom_dedupe_keys)) {
             d->dedupe_keys = 1;
+        } else if(enif_is_identical(val, d->atoms->atom_error_on_duplicate_key)) {
+            d->error_on_duplicate_key = 1;
         } else if(enif_is_identical(val, d->atoms->atom_copy_strings)) {
             d->copy_strings = 1;
         } else if(enif_is_identical(val, d->atoms->atom_use_nil)) {
@@ -536,6 +539,7 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 
     size_t start;
     size_t bytes_processed = 0;
+    int make_object_result;
 
     if(!enif_inspect_binary(env, argv[0], &bin)) {
         return enif_make_badarg(env);
@@ -789,8 +793,11 @@ decode_iter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
                             goto done;
                         }
                         dec_pop_assert(d, st_value);
-                        if(!make_object(env, curr, &val,
-                                d->return_maps, d->dedupe_keys)) {
+                        make_object_result = make_object(env, curr, &val, d->return_maps, d->dedupe_keys, d->error_on_duplicate_key);
+                        if(make_object_result == -1) {
+                            ret = dec_error(d, "duplicate_key");
+                            goto done;
+                        } else if (!make_object_result) {
                             ret = dec_error(d, "internal_object_error");
                             goto done;
                         }

@@ -54,6 +54,7 @@ typedef struct {
     ERL_NIF_TERM    atom_null_term;
     ERL_NIF_TERM    atom_escape_forward_slashes;
     ERL_NIF_TERM    atom_dedupe_keys;
+    ERL_NIF_TERM    atom_error_on_duplicate_key;
     ERL_NIF_TERM    atom_copy_strings;
     ERL_NIF_TERM    atom_undefined;
     ERL_NIF_TERM    atom_utf8_invalid_char_as_is;
@@ -98,6 +99,6 @@ void dec_destroy(ErlNifEnv* env, void* obj);
 void enc_destroy(ErlNifEnv* env, void* obj);
 
 int make_object(ErlNifEnv* env, ERL_NIF_TERM pairs, ERL_NIF_TERM* out,
-        int ret_map, int dedupe_keys);
+        int ret_map, int dedupe_keys, int error_on_duplicate_key);
 
 #endif // Included JIFFY_H
