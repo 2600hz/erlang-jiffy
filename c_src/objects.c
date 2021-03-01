@@ -59,7 +59,8 @@ ht_insert(ErlNifEnv* env, ht_slot* table, unsigned int mask,  ERL_NIF_TERM key, 
 
 
 static int
-make_map(ErlNifEnv* env, ERL_NIF_TERM pairs, ERL_NIF_TERM* out)
+make_map(ErlNifEnv* env, ERL_NIF_TERM pairs, ERL_NIF_TERM* out,
+    int error_on_duplicate_key)
 {
     ERL_NIF_TERM ret;
     ERL_NIF_TERM key;
@@ -116,6 +117,9 @@ make_map(ErlNifEnv* env, ERL_NIF_TERM pairs, ERL_NIF_TERM* out)
             }
             return 1;
         }
+        if(error_on_duplicate_key) {
+            return -1;
+        }
         // Found dups: fall through, dedup, and try again.
     }
 
@@ -131,16 +135,30 @@ make_map(ErlNifEnv* env, ERL_NIF_TERM pairs, ERL_NIF_TERM* out)
     ErlNifUInt64 salt = (ErlNifUInt64) enif_monotonic_time(ERL_NIF_NSEC);
 
     unsigned int unique = 0;
+    int duplicate = 0;
     for(int j = (int)count - 1; j >= 0; j--) {
         if(ht_insert(env, table, mask, keys[j], salt)) {
             unique++;
             keys[count - unique] = keys[j];
             vals[count - unique] = vals[j];
+        } else if(error_on_duplicate_key) {
+            duplicate = 1;
+            break;
         }
     }
 
     if(table != stack_table) {
         enif_free(table);
+    }
+
+    if(duplicate) {
+        if(keys != small_keys) {
+            enif_free(keys);
+        }
+        if(vals != small_vals) {
+            enif_free(vals);
+        }
+        return -1;
     }
 
     rv = enif_make_map_from_arrays(env,
@@ -168,7 +186,7 @@ make_map(ErlNifEnv* env, ERL_NIF_TERM pairs, ERL_NIF_TERM* out)
 //
 static int
 make_proplist(ErlNifEnv* env, ERL_NIF_TERM pairs, ERL_NIF_TERM* out,
-    int dedupe_keys)
+    int dedupe_keys, int error_on_duplicate_key)
 {
     ERL_NIF_TERM key;
     ERL_NIF_TERM val;
@@ -194,7 +212,7 @@ make_proplist(ErlNifEnv* env, ERL_NIF_TERM pairs, ERL_NIF_TERM* out,
     unsigned int mask = 0;
     ErlNifUInt64 salt = 0;
 
-    if(dedupe_keys) {
+    if(dedupe_keys || error_on_duplicate_key) {
         unsigned int ht_size = ht_size_power_of_2(count);
         table = (ht_size <= HT_STACK_SLOTS)
             ? stack_table
@@ -206,16 +224,20 @@ make_proplist(ErlNifEnv* env, ERL_NIF_TERM pairs, ERL_NIF_TERM* out,
 
     // Fill array backwards since list is reversed from parsing
     unsigned int unique = 0;
+    int duplicate = 0;
     unsigned int i = count;
     while(enif_get_list_cell(env, pairs, &val, &pairs)) {
         if(!enif_get_list_cell(env, pairs, &key, &pairs)) {
             assert(0 && "Unbalanced object pairs.");
         }
-        if(dedupe_keys) {
+        if(dedupe_keys || error_on_duplicate_key) {
             if(ht_insert(env, table, mask, key, salt)) {
                 --i;
                 arr[i] = enif_make_tuple2(env, key, val);
                 unique++;
+            } else if(error_on_duplicate_key) {
+                duplicate = 1;
+                break;
             }
         } else {
             --i;
@@ -224,8 +246,15 @@ make_proplist(ErlNifEnv* env, ERL_NIF_TERM pairs, ERL_NIF_TERM* out,
         }
     }
 
-    if(dedupe_keys && table != stack_table) {
+    if(table != NULL && table != stack_table) {
         enif_free(table);
+    }
+
+    if(duplicate) {
+        if(arr != small_arr) {
+            enif_free(arr);
+        }
+        return -1;
     }
 
     ERL_NIF_TERM list = enif_make_list_from_array(env, arr + count - unique, unique);
@@ -241,11 +270,11 @@ make_proplist(ErlNifEnv* env, ERL_NIF_TERM pairs, ERL_NIF_TERM* out,
 
 int
 make_object(ErlNifEnv* env, ERL_NIF_TERM pairs, ERL_NIF_TERM* out,
-    int ret_map, int dedupe_keys)
+    int ret_map, int dedupe_keys, int error_on_duplicate_key)
 {
     if(ret_map) {
-        return make_map(env, pairs, out);
+        return make_map(env, pairs, out, error_on_duplicate_key);
     } else {
-        return make_proplist(env, pairs, out, dedupe_keys);
+        return make_proplist(env, pairs, out, dedupe_keys, error_on_duplicate_key);
     }
 }
